@@ -56,16 +56,3 @@
         <p>Story Reader розвивається поступово.</p>
         <p>Created by BURSUCHOK. 2026.</p>
     </div>
-    <div class="settings-actions">
-        <<button "Повернутися до налаштувань">>
-            <<goto "Settings">>
-        <</button>>
-        <<button "Повернутися в меню">>
-            <<run setup.clearSuspendedReading()>>
-            <<goto "Menu">>
-        <</button>>
-<<button "Підтримка (TG BOT)">>
-    <<run setup.clearSuspendedReading()>>
-    <<run window.location.href = "https://t.me/storyreadersupbot">>
-<</button>>
-</div>
