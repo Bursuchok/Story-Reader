@@ -1,92 +1,158 @@
+
 <<readerui>>
-<div class="settings-page changelog-page">
-    <div class="settings-header">
-        <div class="settings-symbol">↻</div>
+<div class="settings-page sr-cl-page">
+
+    <header class="sr-cl-header">
+        <div class="sr-cl-header-icon">↻</div>
         <h1>Журнал оновлень</h1>
         <p>Історія розвитку Story Reader</p>
-    </div>
-    <!-- Інформаційний блок -->
-    <div class="changelog-pinned">
-        <div class="changelog-pinned-top">
-            <span class="changelog-live-dot"></span>
+    </header>
+
+    <section class="sr-cl-project">
+        <div class="sr-cl-project-status">
+            <span class="sr-cl-status-dot"></span>
             <span>ПРОЄКТ У РОЗРОБЦІ</span>
         </div>
+
         <h2>Story Reader</h2>
-        <p class="changelog-pinned-description">
-            Story Reader розвивається поступово.
-        </p>
-        <div class="changelog-pinned-bottom">
+        <p>Story Reader розвивається поступово.</p>
+
+        <div class="sr-cl-project-footer">
             <span>BUILD HISTORY</span>
             <span>BURSUCHOK. / 2026</span>
         </div>
+    </section>
+
+    <div class="sr-cl-timeline">
+
+        <!-- 0.1.1a -->
+        <article class="sr-cl-entry">
+            <div class="sr-cl-meta">
+                <span class="sr-cl-date">28.10.2026</span>
+                <span class="sr-cl-version">0.1.1a</span>
+            </div>
+
+            <h2 class="sr-cl-summary">
+                Робота над імпортом, виправлення помилок і стилізація.
+            </h2>
+
+            <button class="sr-cl-toggle"
+                    type="button"
+                    aria-expanded="false">
+                <span>Переглянути зміни</span>
+                <span class="sr-cl-chevron" aria-hidden="true">⌄</span>
+            </button>
+
+            <div class="sr-cl-panel" hidden>
+                <div class="sr-cl-panel-inner">
+                    <ul>
+                        <li>Закріплення єдиної системи імпорту з змогою редагування вмісту у реальному часі.</li>
+                        <li>Виправлення помилок загрузки історій.</li>
+                        <li>Оновлено деякі стилі.</li>
+                        <li>Налаштовано до мінімально-робочої системи: відновлення останього збереження.</li>
+                    </ul>
+                </div>
+            </div>
+        </article>
+
+        <!-- 0.1.0a -->
+        <article class="sr-cl-entry">
+            <div class="sr-cl-meta">
+                <span class="sr-cl-date">27.10.2026</span>
+                <span class="sr-cl-version">0.1.0a</span>
+            </div>
+
+            <h2 class="sr-cl-summary">
+                Початок великих змін і створення основних систем.
+            </h2>
+
+            <button class="sr-cl-toggle"
+                    type="button"
+                    aria-expanded="false">
+                <span>Переглянути зміни</span>
+                <span class="sr-cl-chevron" aria-hidden="true">⌄</span>
+            </button>
+
+            <div class="sr-cl-panel" hidden>
+                <div class="sr-cl-panel-inner">
+                    <ul>
+                        <li>Оновлено систему передачі данних з зовнішніх ресурсів.</li>
+                        <li>Виправлено багато помилок (та створено нових...).</li>
+                        <li>Добавлено робочий карказ бібліотеки.</li>
+                        <li>Оновлено меню. Добавлено нові кнопки.</li>
+                        <li>Створений спосіб збереження (у нестабільному стані. Буде замінений.)</li>
+                        <li>Створено заготовку для "TypeDisable" (покищо не робоча).</li>
+                    </ul>
+                </div>
+            </div>
+        </article>
+
+        <!-- 0.0.2a -->
+        <article class="sr-cl-entry">
+            <div class="sr-cl-meta">
+                <span class="sr-cl-date">22.10.2026</span>
+                <span class="sr-cl-version">0.0.2a</span>
+            </div>
+
+            <h2 class="sr-cl-summary">
+                Зміна системи завантаження історій.
+            </h2>
+
+            <button class="sr-cl-toggle"
+                    type="button"
+                    aria-expanded="false">
+                <span>Переглянути зміни</span>
+                <span class="sr-cl-chevron" aria-hidden="true">⌄</span>
+            </button>
+
+            <div class="sr-cl-panel" hidden>
+                <div class="sr-cl-panel-inner">
+                    <ul>
+                        <li>Створено зовнішній ресурс для зберігання історій.</li>
+                        <li>Виправлено меню, налаштування та пробна зала.</li>
+                    </ul>
+                </div>
+            </div>
+        </article>
+
+        <!-- 0.0.1a -->
+        <article class="sr-cl-entry">
+            <div class="sr-cl-meta">
+                <span class="sr-cl-date">19.10.2026</span>
+                <span class="sr-cl-version">0.0.1a</span>
+            </div>
+
+            <h2 class="sr-cl-summary">
+                Початок Story Reader.
+            </h2>
+
+            <button class="sr-cl-toggle"
+                    type="button"
+                    aria-expanded="false">
+                <span>Переглянути зміни</span>
+                <span class="sr-cl-chevron" aria-hidden="true">⌄</span>
+            </button>
+
+            <div class="sr-cl-panel" hidden>
+                <div class="sr-cl-panel-inner">
+                    <ul>
+                        <li>Створено стартовий екран із плавною анімацією появи.</li>
+                        <li>Додано персоналізацію читання: шрифти, кольори та готові теми.</li>
+                        <li>Реалізовано налаштування швидкості появи тексту.</li>
+                        <li>Додано автоматичне прокручування під час читання.</li>
+                        <li>Додано звукові атмосфери та керування музикою.</li>
+                        <li>Створено окремий журнал оновлень.</li>
+                    </ul>
+                </div>
+            </div>
+        </article>
+
     </div>
-    <!-- VERSION 0.1.1a -->
-    <div class="changelog-entry">
-        <div class="changelog-meta">
-            <span class="changelog-date">28.10.2026</span>
-            <span class="changelog-version">0.1.1a</span>
-        </div>
-        <div class="changelog-summary">
-            Робота над імпортом, виправлення помилок і стилізація.
-        </div>
-        <ul>
-            <li>Закріплення єдиної системи імпорту з змогою редагування вмісту у реальному часі.</li>
-            <li>Виправлення помилок загрузки історій.</li>
-            <li>Оновлено деякі стилі.</li>
-            <li>Налаштовано до мінімально-робочої системи: відновлення останього збереження.</li>
-        </ul>
-    </div>
-    <!-- VERSION 0.1.0a -->
-    <div class="changelog-entry">
-        <div class="changelog-meta">
-            <span class="changelog-date">27.10.2026</span>
-            <span class="changelog-version">0.1.0a</span>
-        </div>
-        <div class="changelog-summary">
-            Початок великих змін і створення основних систем.
-        </div>
-        <ul>
-            <li>Оновлено систему передачі данних з зовнішніх ресурсів.</li>
-            <li>Виправлено багато помилок (та створено нових...).</li>
-            <li>Добавлено робочий карказ бібліотеки.</li>
-            <li>Оновлено меню. Добавлено нові кнопки.</li>
-            <li>Створений спосіб збереження (у нестабільному стані. Буде замінений.)</li>
-            <li>Створено заготовку для "TypeDisable" (покищо не робоча).</li>
-        </ul>
-    </div>
-    <!-- VERSION 0.0.2a -->
-    <div class="changelog-entry">
-        <div class="changelog-meta">
-            <span class="changelog-date">22.10.2026</span>
-            <span class="changelog-version">0.0.2a</span>
-        </div>
-        <div class="changelog-summary">
-            Зміна системи завантаження історій.
-        </div>
-        <ul>
-            <li>Створено зовнішній ресурс для зберігання історій.</li>
-            <li>Виправлено меню, налаштування та пробна зала.</li>
-        </ul>
-    </div>
-    <!-- VERSION 0.0.1a -->
-    <div class="changelog-entry">
-        <div class="changelog-meta">
-            <span class="changelog-date">19.10.2026</span>
-            <span class="changelog-version">0.0.1a</span>
-        </div>
-        <div class="changelog-summary">
-            Початок Story Reader.
-        </div>
-        <ul>
-            <li>Створено стартовий екран із плавною анімацією появи.</li>
-            <li>Додано персоналізацію читання: шрифти, кольори та готові теми.</li>
-            <li>Реалізовано налаштування швидкості появи тексту.</li>
-            <li>Додано автоматичне прокручування під час читання.</li>
-            <li>Додано звукові атмосфери та керування музикою.</li>
-            <li>Створено окремий журнал оновлень.</li>
-        </ul>
-    </div>
-    <div class="changelog-footer">
-        <p>Created by BURSUCHOK. 2026.</p>
-    </div>
+
+    <footer class="sr-cl-footer">
+        <span>STORY READER</span>
+        <span>CREATED BY BURSUCHOK. 2026.</span>
+    </footer>
+
 </div>
+<</readerui>>
