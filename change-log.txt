@@ -1,16 +1,93 @@
+
 <<readerui>>
 <div class="settings-page changelog-page">
+
     <div class="settings-header">
         <div class="settings-symbol">↻</div>
         <h1>Журнал оновлень</h1>
         <p>Історія розвитку Story Reader</p>
     </div>
+
+    <!-- Закріплений інформаційний блок -->
+    <div class="changelog-pinned">
+        <div class="changelog-pinned-top">
+            <span class="changelog-live-dot"></span>
+            <span>ПРОЄКТ У РОЗРОБЦІ</span>
+            <span class="changelog-pinned-line"></span>
+        </div>
+
+        <h2>Story Reader</h2>
+
+        <p class="changelog-pinned-description">
+            Story Reader розвивається поступово.
+        </p>
+
+        <div class="changelog-pinned-bottom">
+            <span>BUILD HISTORY</span>
+            <span>BURSUCHOK. / 2026</span>
+        </div>
+    </div>
+
+    <!-- 28.10.2026 -->
+    <div class="changelog-entry">
+        <div class="changelog-meta">
+            <span>28.10.2026</span>
+            <span class="changelog-version">Поточна версія: 0.1.1a</span>
+        </div>
+
+        <h2>Робота над імпортом. Виправлення помилок. Стилізація.</h2>
+
+        <ul>
+            <li>Закріплення єдиної системи імпорту з змогою редагування вмісту у реальному часі.</li>
+            <li>Виправлення помилок загрузки історій.</li>
+            <li>Оновлено деякі стилі.</li>
+            <li>Налаштовано до мінімально-робочої системи: відновлення останього збереження.</li>
+        </ul>
+    </div>
+
+    <!-- 27.10.2026 -->
+    <div class="changelog-entry">
+        <div class="changelog-meta">
+            <span>27.10.2026</span>
+            <span class="changelog-version">Поточна версія: 0.1.0a</span>
+        </div>
+
+        <h2>Початок великих змін</h2>
+
+        <ul>
+            <li>Оновлено систему передачі данних з зовнішніх ресурсів.</li>
+            <li>Виправлено багато помилок (та створено нових...).</li>
+            <li>Добавлено робочий карказ бібліотеки.</li>
+            <li>Оновлено меню. Добавлено нові кнопки.</li>
+            <li>Створений спосіб збереження (у нестабільному стані. Буде замінений.)</li>
+            <li>Створено заготовку для "TypeDisable" (покищо не робоча).</li>
+        </ul>
+    </div>
+
+    <!-- 22.10.2026 -->
+    <div class="changelog-entry">
+        <div class="changelog-meta">
+            <span>22.10.2026</span>
+            <span class="changelog-version">Поточна версія: 0.0.2a</span>
+        </div>
+
+        <h2>Зміна системи завантаження історій</h2>
+
+        <ul>
+            <li>Створено зовнішній ресурс для зберігання історій.</li>
+            <li>Виправлено меню, налаштування та пробна зала.</li>
+        </ul>
+    </div>
+
+    <!-- 19.10.2026 -->
     <div class="changelog-entry">
         <div class="changelog-meta">
             <span>19.10.2026</span>
             <span class="changelog-version">Поточна версія: 0.0.1a</span>
         </div>
+
         <h2>Початок Story Reader</h2>
+
         <ul>
             <li>Створено стартовий екран із плавною анімацією появи.</li>
             <li>Додано персоналізацію читання: шрифти, кольори та готові теми.</li>
@@ -20,39 +97,10 @@
             <li>Створено окремий журнал оновлень.</li>
         </ul>
     </div>
-    <div class="changelog-entry">
-        <div class="changelog-meta">
-            <span>22.10.2026</span>
-            <span class="changelog-version">Поточна версія: 0.0.2a</span>
-        </div>
-     <h2>Зміна системи завантаження історій</h2>
-        <ul>
-            <li>Створено зовнішній ресурс для зберігання історій.</li>
-            <li>Виправлено меню, налаштування та пробна зала.</li>
-        </ul>
-    </div>
- <div class="changelog-entry">
-        <div class="changelog-meta">
-            <span>27.10.2026</span>
-            <span class="changelog-version">Поточна версія: 0.1.0a</span>
-        </div>
-        <h2>Початок великих змін</h2>
-        <ul>
-            <li>Оновлено систему передачі данних з зовнішніх ресурсів.</li>
-            <li>Виправлено багато помилок (та створено нових...).</li>
-            <li>Добавлено робочий карказ бібліотеки.</li>
-            <li>Оновлено меню. Добавлено нові кнопки.</li>
-            <li>Створений спосіб збереження (у нестабільному стані. Буде замінений.)</li>
-            <li>Створено заготовку для "TypeDisable" (покищо не робоча).</li></ul>
-<div class="changelog-entry">
-        <div class="changelog-meta">
-            <span>28.10.2026</span>
-            <span class="changelog-version">Поточна версія: 0.1.1a</span>
-        </div>
-        <h2>Робота над імпортом. Виправлення помилок.</h2>
-        <ul>
-            <li>Закріплення єдиної системи імпорту з змогою редагування вмісту у реальному часі.</li></ul>
+
     <div class="changelog-footer">
-        <p>Story Reader розвивається поступово.</p>
         <p>Created by BURSUCHOK. 2026.</p>
     </div>
+
+</div>
+
