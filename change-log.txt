@@ -51,6 +51,16 @@
             <li>Оновлено меню. Добавлено нові кнопки.</li>
             <li>Створений спосіб збереження (у нестабільному стані. Буде замінений.)</li>
             <li>Створено заготовку для "TypeDisable" (покищо не робоча).</li></ul>
+<div class="changelog-entry">
+        <div class="changelog-meta">
+            <span>28.10.2026</span>
+            <span class="changelog-version">Поточна версія: 0.1.1a</span>
+        </div>
+
+        <h2>Робота над імпортом. Виправлення помилок.</h2>
+
+        <ul>
+            <li>Закріплення єдиної системи імпорту з змогою редагування вмісту у реальному часі.</li></ul>
     <div class="changelog-footer">
         <p>Story Reader розвивається поступово.</p>
         <p>Created by BURSUCHOK. 2026.</p>
