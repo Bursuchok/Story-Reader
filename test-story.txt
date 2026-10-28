@@ -60,21 +60,6 @@
 Потім поклав квиток у кишеню.
 
 <<savehere>>
-
-<<if typeof setup !== "undefined" && typeof setup.returnToReading === "function">>
-    <<button "Повернутися до меню">>
-        <<run setup.returnToReading()>>
-    <</button>>
-<<else>>
-    <<button "Повернутися до меню">>
-        <<goto "Menu">>
-    <</button>>
-<</if>>
-
-<<button "Відкрити налаштування">>
-    <<goto "Settings">>
-<</button>>
-
 ---
 
 ## 2. Будівля вокзалу
