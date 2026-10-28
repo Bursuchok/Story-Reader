@@ -1,4 +1,3 @@
-
 <<readerui>>
 <div class="settings-page sr-cl-page">
 
@@ -185,4 +184,3 @@
     </footer>
 
 </div>
-<</readerui>>
