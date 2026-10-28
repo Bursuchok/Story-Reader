@@ -5,5 +5,12 @@
     "genre": "Військова драма",
     "description": "Історія про солдатів в оточенні.",
     "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/test-story.txt"
+  },
+  {
+    "title": "Історія не про хлопчика",
+    "author": "Bursuchok",
+    "genre": "Військова драма напевне",
+    "description": "Історія про солдатів в оточенні НЕНГНЕНГШЩД.",
+    "url": ""
   }
 ]
