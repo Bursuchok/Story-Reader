@@ -10,7 +10,7 @@
     <section class="sr-cl-project">
         <div class="sr-cl-project-status">
             <span class="sr-cl-status-dot"></span>
-            <span>ПРОЄКТ У РОЗРОБЦІ</span>
+            <span>ПРОЄКТ У РОЗРОБЦІ: 1.1.1а</span>
         </div>
 
         <h2>Story Reader</h2>
@@ -23,6 +23,42 @@
     </section>
 
     <div class="sr-cl-timeline">
+ <!-- ══════════════════════════════════════════════
+             ПОЧАТОК КАРТКИ 1.1.1a
+             ══════════════════════════════════════════════ -->
+
+        <!-- 1.1.1a -->
+        <article class="sr-cl-entry">
+            <div class="sr-cl-meta">
+                <span class="sr-cl-date">29.10.2026</span>
+                <span class="sr-cl-version">1.1.1a</span>
+            </div>
+
+            <h2 class="sr-cl-summary">
+               Підготовка проекту до релізу.
+            </h2>
+
+            <button class="sr-cl-toggle"
+                    type="button"
+                    aria-expanded="false">
+                <span>Переглянути зміни</span>
+                <span class="sr-cl-chevron" aria-hidden="true">⌄</span>
+            </button>
+
+            <div class="sr-cl-panel" hidden>
+                <div class="sr-cl-panel-inner">
+                    <ul>
+<li>Створено Telegram-канал для публікації новин та важливих оновлень проєкту. <a href="https://t.me/s/StoryReaderByBursuchok">Перейти до каналу</a></li>
+<li>Розпочато активну роботу над новими історіями для бібліотеки Story Reader.</li>
+<li>Оновлено службу технічної підтримки: додано можливість пропонувати власні ідеї для розвитку проєкту.</li>
+<li>Додано плаваючу кнопку переходу до Telegram-каналу в головному меню Story Reader.</li>
+<li>Виправлено низку проблем із підключенням до онлайн-каталогу.</li>
+                    </ul>
+                </div>
+            </div>
+        </article>
+
+        <!-- ───────────── КІНЕЦЬ КАРТКИ 1.1.1a ───────────── -->
 
 
         <!-- ══════════════════════════════════════════════
