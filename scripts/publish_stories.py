@@ -1,8 +1,16 @@
-
+import argparse
 import json
+import os
 import sys
+import tempfile
+
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
+
+
+# ============================================================
+# НАЛАШТУВАННЯ
+# ============================================================
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -33,6 +41,19 @@ REQUIRED_FIELDS = [
     "ratingDescription",
 ]
 
+# Межі довжини не блокують публікацію.
+# Вони лише показують попередження.
+FIELD_LENGTH_LIMITS = {
+    "title": 100,
+    "description": 300,
+    "detailedDescription": 1500,
+    "ratingDescription": 1000,
+}
+
+
+# ============================================================
+# ПОМИЛКИ ТА СТАТИСТИКА
+# ============================================================
 
 class PublishError(Exception):
     def __init__(self, code, message):
@@ -45,17 +66,194 @@ def error(code, message):
     raise PublishError(code, message)
 
 
+stats = {
+    "added": 0,
+    "updated": 0,
+    "unchanged": 0,
+    "removed": 0,
+    "orphans": 0,
+    "warnings": 0,
+}
+
+
+def warning(message):
+    stats["warnings"] += 1
+    print(f"[УВАГА] {message}")
+
+
+# ============================================================
+# ДОПОМІЖНІ ФУНКЦІЇ
+# ============================================================
+
 def make_url(path):
     relative_path = path.relative_to(ROOT).as_posix()
     return RAW_BASE_URL + quote(relative_path, safe="/")
 
 
+def normalize(value):
+    return value.strip().casefold()
+
+
+def duplicate_json_keys(pairs):
+    result = {}
+
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Повторюється JSON-ключ: {key}")
+
+        result[key] = value
+
+    return result
+
+
+def load_json(text, filename):
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=duplicate_json_keys
+        )
+    except json.JSONDecodeError as exc:
+        error(
+            "E004",
+            f"{filename}: рядок {exc.lineno}, "
+            f"стовпець {exc.colno}: {exc.msg}."
+        )
+    except ValueError as exc:
+        error("E008", f"{filename}: {exc}")
+
+
+def atomic_write(path, content):
+    """
+    Записує файл через тимчасовий файл.
+    Оригінал замінюється лише після успішного запису.
+    """
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp:
+            temp.write(content)
+            temp.flush()
+            os.fsync(temp.fileno())
+            temp_path = Path(temp.name)
+
+        os.replace(temp_path, path)
+
+    except OSError:
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
+        raise
+
+
+def is_published_url(url):
+    return (
+        isinstance(url, str)
+        and url.startswith(PUBLISHED_URL_PREFIX)
+    )
+
+
+def published_filename_from_url(url):
+    if not is_published_url(url):
+        return None
+
+    relative = url[len(PUBLISHED_URL_PREFIX):]
+
+    # Не дозволяємо URL виходити за межі Published Stories.
+    if not relative or "/" in relative or "\\" in relative:
+        return None
+
+    filename = relative
+
+    if not filename.lower().endswith(".txt"):
+        return None
+
+    return filename
+
+
+# ============================================================
+# ПЕРЕВІРКА МЕТАДАНИХ
+# ============================================================
+
+def validate_metadata(metadata, filename):
+    if not isinstance(metadata, dict):
+        error(
+            "E109",
+            f"{filename} — метадані повинні бути JSON-об'єктом."
+        )
+
+    for field in REQUIRED_FIELDS:
+        if field not in metadata:
+            error(
+                "E110",
+                f'{filename} — відсутнє поле "{field}".'
+            )
+
+        value = metadata[field]
+
+        if not isinstance(value, str) or not value.strip():
+            error(
+                "E111",
+                f'{filename} — поле "{field}" має бути непорожнім текстом.'
+            )
+
+    if "contentWarnings" not in metadata:
+        error(
+            "E112",
+            f'{filename} — відсутнє поле "contentWarnings".'
+        )
+
+    warnings_list = metadata["contentWarnings"]
+
+    if not isinstance(warnings_list, list):
+        error(
+            "E113",
+            f'{filename} — "contentWarnings" має бути списком [].'
+        )
+
+    if not all(
+        isinstance(item, str) and item.strip()
+        for item in warnings_list
+    ):
+        error(
+            "E114",
+            f'{filename} — кожне попередження має бути непорожнім текстом.'
+        )
+
+    for field, limit in FIELD_LENGTH_LIMITS.items():
+        if len(metadata[field]) > limit:
+            warning(
+                f'{filename} — поле "{field}" має '
+                f'{len(metadata[field])} символів. Рекомендована межа: {limit}.'
+            )
+
+    return metadata
+
+
+# ============================================================
+# ЧИТАННЯ ТА ПЕРЕВІРКА ІСТОРІЙ
+# ============================================================
+
 def read_source(path):
-    # E101: файл неможливо прочитати.
     try:
         text = path.read_text(encoding="utf-8-sig")
     except UnicodeDecodeError:
-        error("E101", f"{path.name} — файл має неправильне кодування. Потрібен UTF-8.")
+        error(
+            "E101",
+            f"{path.name} — неправильне кодування. Потрібен UTF-8."
+        )
     except OSError as exc:
         error("E101", f"{path.name} — не вдалося прочитати файл: {exc}")
 
@@ -64,22 +262,22 @@ def read_source(path):
     metadata_count = sum(
         line.strip() == METADATA_MARKER for line in lines
     )
+
     content_count = sum(
         line.strip() == CONTENT_MARKER for line in lines
     )
 
-    # E102–E105: перевірка маркерів.
     if metadata_count == 0:
-        error("E102", f"{path.name} — відсутній маркер STORY-METADATA.")
+        error("E102", f"{path.name} — відсутній STORY-METADATA.")
 
     if metadata_count > 1:
-        error("E103", f"{path.name} — маркер STORY-METADATA повторюється.")
+        error("E103", f"{path.name} — STORY-METADATA повторюється.")
 
     if content_count == 0:
-        error("E104", f"{path.name} — відсутній маркер STORY-CONTENT.")
+        error("E104", f"{path.name} — відсутній STORY-CONTENT.")
 
     if content_count > 1:
-        error("E105", f"{path.name} — маркер STORY-CONTENT повторюється.")
+        error("E105", f"{path.name} — STORY-CONTENT повторюється.")
 
     metadata_line = next(
         i for i, line in enumerate(lines)
@@ -91,7 +289,6 @@ def read_source(path):
         if line.strip() == CONTENT_MARKER
     )
 
-    # E106: неправильний порядок маркерів.
     if content_line <= metadata_line:
         error(
             "E106",
@@ -109,274 +306,469 @@ def read_source(path):
 
     content = "".join(content_lines)
 
-    # E107: порожня історія.
     if not content.strip():
-        error("E107", f"{path.name} — текст історії відсутній або порожній.")
+        error("E107", f"{path.name} — текст історії порожній.")
 
-    # E108: неправильний JSON.
-    try:
-        metadata = json.loads(metadata_text)
-    except json.JSONDecodeError as exc:
-        error(
-            "E108",
-            f"{path.name} — помилка JSON у метаданих: "
-            f"рядок {exc.lineno}, стовпець {exc.colno}: {exc.msg}."
-        )
+    metadata = load_json(metadata_text, path.name)
+    validate_metadata(metadata, path.name)
 
-    # E109: кореневий елемент не є об'єктом.
-    if not isinstance(metadata, dict):
-        error(
-            "E109",
-            f"{path.name} — метадані повинні бути JSON-об'єктом у фігурних дужках."
-        )
-
-    # E110: обов'язкове поле відсутнє.
-    # E111: обов'язкове поле має неправильний тип або порожнє.
-    for field in REQUIRED_FIELDS:
-        if field not in metadata:
-            error(
-                "E110",
-                f'{path.name} — відсутнє обов’язкове поле "{field}".'
-            )
-
-        value = metadata[field]
-
-        if not isinstance(value, str) or not value.strip():
-            error(
-                "E111",
-                f'{path.name} — поле "{field}" має бути непорожнім текстом.'
-            )
-
-    # E112: contentWarnings відсутнє.
-    if "contentWarnings" not in metadata:
-        error(
-            "E112",
-            f'{path.name} — відсутнє обов’язкове поле "contentWarnings".'
-        )
-
-    warnings = metadata["contentWarnings"]
-
-    # E113: contentWarnings не є списком.
-    if not isinstance(warnings, list):
-        error(
-            "E113",
-            f'{path.name} — "contentWarnings" має бути списком [].'
-        )
-
-    # E114: неправильний елемент списку попереджень.
-    if not all(
-        isinstance(item, str) and item.strip()
-        for item in warnings
-    ):
-        error(
-            "E114",
-            f"{path.name} — кожне попередження має бути непорожнім текстом."
-        )
-
-    # Перевірка тегів storytype.
     opening_tag = "<<storytype>>"
     closing_tag = "<</storytype>>"
 
     opening_count = content.count(opening_tag)
     closing_count = content.count(closing_tag)
 
-    # E115–E118: перевірка тегів.
     if opening_count == 0:
-        error("E115", f"{path.name} — відсутній тег <<storytype>>.")
+        error("E115", f"{path.name} — відсутній <<storytype>>.")
 
     if opening_count > 1:
-        error("E116", f"{path.name} — тег <<storytype>> повторюється.")
+        error("E116", f"{path.name} — <<storytype>> повторюється.")
 
     if closing_count == 0:
-        error("E117", f"{path.name} — відсутній тег <</storytype>>.")
+        error("E117", f"{path.name} — відсутній <</storytype>>.")
 
     if closing_count > 1:
-        error("E118", f"{path.name} — тег <</storytype>> повторюється.")
+        error("E118", f"{path.name} — <</storytype>> повторюється.")
 
     opening_position = content.find(opening_tag)
     closing_position = content.find(closing_tag)
 
-    # E119: неправильний порядок тегів.
     if closing_position <= opening_position:
         error(
             "E119",
-            f"{path.name} — <<storytype>> має стояти перед <</storytype>>."
+            f"{path.name} — теги storytype стоять у неправильному порядку."
         )
 
     story_body = content[
         opening_position + len(opening_tag):closing_position
     ]
 
-    # E120: порожній текст між тегами.
     if not story_body.strip():
-        error(
-            "E120",
-            f"{path.name} — між тегами storytype немає тексту."
-        )
+        error("E120", f"{path.name} — текст між тегами storytype порожній.")
 
     return metadata, content
 
 
-def main():
-    # E001: немає каталогу.
+# ============================================================
+# ПЕРЕВІРКА КАТАЛОГУ
+# ============================================================
+
+def load_catalog():
     if not CATALOG.exists():
-        error("E001", "Не знайдено файл catalog.json.")
+        error("E001", "Не знайдено catalog.json.")
 
-    # E002: немає папки для нових історій.
-    if not INBOX.exists():
-        error("E002", "Не знайдено папку New Stories.")
-
-    # E003: каталог неможливо прочитати.
     try:
-        catalog_text = CATALOG.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
+        catalog_text = CATALOG.read_text(encoding="utf-8-sig")
+    except OSError as exc:
         error("E003", f"Не вдалося прочитати catalog.json: {exc}")
 
-    # E004: каталог містить неправильний JSON.
-    try:
-        catalog = json.loads(catalog_text)
-    except json.JSONDecodeError as exc:
-        error(
-            "E004",
-            f"Помилка JSON у catalog.json: "
-            f"рядок {exc.lineno}, стовпець {exc.colno}: {exc.msg}."
-        )
+    # Порожній файл або файл із пробілами = порожній каталог.
+    if not catalog_text.strip():
+        print("Каталог порожній. Буде створено новий [].")
+        return []
 
-    # E005: каталог не є масивом.
+    catalog = load_json(catalog_text, "catalog.json")
+
     if not isinstance(catalog, list):
         error("E005", "catalog.json повинен містити JSON-масив [].")
 
-    source_files = sorted(INBOX.glob("*.txt"))
+    seen_titles = set()
+    seen_urls = set()
 
-    if not source_files:
-        print("У New Stories немає TXT-файлів.")
+    for index, item in enumerate(catalog, start=1):
+        if not isinstance(item, dict):
+            error(
+                "E009",
+                f"Запис №{index} у каталозі повинен бути об'єктом."
+            )
 
-    # Спочатку перевіряємо всі вхідні файли.
+        validate_metadata(item, f"catalog.json, запис №{index}")
+
+        url = item.get("url")
+
+        if not isinstance(url, str) or not url.strip():
+            error(
+                "E010",
+                f"Запис №{index} не має правильного URL."
+            )
+
+        title_key = normalize(item["title"])
+        url_key = url.strip()
+
+        if title_key in seen_titles:
+            error(
+                "E122",
+                f'У каталозі повторюється назва "{item["title"]}".'
+            )
+
+        if url_key in seen_urls:
+            error(
+                "E011",
+                f"У каталозі повторюється URL: {url_key}"
+            )
+
+        seen_titles.add(title_key)
+        seen_urls.add(url_key)
+
+    return catalog
+
+
+# ============================================================
+# ПЕРЕВІРКА ФАЙЛІВ
+# ============================================================
+
+def get_txt_files(folder):
+    if not folder.exists():
+        return []
+
+    return sorted(
+        path for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() == ".txt"
+    )
+
+
+def check_filename_collisions(files):
+    seen = {}
+
+    for path in files:
+        key = path.name.casefold()
+
+        if key in seen:
+            error(
+                "E012",
+                f'Конфлікт назв файлів: "{seen[key].name}" '
+                f'і "{path.name}".'
+            )
+
+        seen[key] = path
+
+
+# ============================================================
+# ОСНОВНА ЛОГІКА
+# ============================================================
+
+def main(dry_run=False):
+    print("=" * 55)
+    print("STORY READER — БІБЛІОТЕКАР")
+    print("=" * 55)
+
+    if not INBOX.exists():
+        error("E002", "Не знайдено папку New Stories.")
+
+    catalog = load_catalog()
+
+    source_files = get_txt_files(INBOX)
+    published_files = get_txt_files(PUBLISHED)
+
+    check_filename_collisions(source_files)
+    check_filename_collisions(published_files)
+
+    print(f"\nФайлів у New Stories: {len(source_files)}")
+    print(f"Опублікованих файлів: {len(published_files)}")
+    print(f"Записів у каталозі: {len(catalog)}")
+
+    # --------------------------------------------------------
+    # 1. Перевірка всіх нових історій
+    # --------------------------------------------------------
+
     prepared = []
     seen_titles = set()
 
     for source in source_files:
         metadata, content = read_source(source)
-        title_key = metadata["title"].strip().casefold()
 
-        # E121: дубль назви серед нових історій.
+        title_key = normalize(metadata["title"])
+
         if title_key in seen_titles:
             error(
                 "E121",
-                f'Дві історії в New Stories мають однакову назву: '
-                f'"{metadata["title"]}".'
+                f'У New Stories повторюється назва "{metadata["title"]}".'
             )
 
         seen_titles.add(title_key)
+
         prepared.append((source, metadata, content))
 
-    # Готуємо записи каталогу та файли для публікації.
-    new_catalog = list(catalog)
-    updates = []
+    # --------------------------------------------------------
+    # 2. Підготовка нового каталогу
+    # --------------------------------------------------------
+
+    new_catalog = [dict(item) for item in catalog]
+    planned_files = {}
 
     for source, metadata, content in prepared:
         output_path = PUBLISHED / source.name
         url = make_url(output_path)
 
-        record = dict(metadata)
-        record["url"] = url
+        title_key = normalize(metadata["title"])
 
         matches = [
             i for i, item in enumerate(new_catalog)
-            if isinstance(item, dict)
-            and str(item.get("title", "")).strip().casefold()
-            == metadata["title"].strip().casefold()
+            if normalize(item["title"]) == title_key
         ]
 
-        # E122: кілька записів з однаковою назвою в каталозі.
         if len(matches) > 1:
             error(
                 "E122",
-                f'У catalog.json знайдено кілька записів з назвою '
-                f'"{metadata["title"]}". Потрібно виправити дублікати.'
+                f'Кілька записів із назвою "{metadata["title"]}".'
             )
+
+        # Не дозволяємо двом історіям використовувати один URL.
+        for i, item in enumerate(new_catalog):
+            if i not in matches and item.get("url") == url:
+                error(
+                    "E011",
+                    f"URL {url} уже використовується іншою історією."
+                )
 
         if matches:
-            new_catalog[matches[0]] = record
-            action = "Оновлено"
+            index = matches[0]
+
+            # Зберігаємо додаткові поля старого запису.
+            record = dict(new_catalog[index])
+            record.update(metadata)
+            record["url"] = url
+
+            if record == new_catalog[index]:
+                stats["unchanged"] += 1
+                action = "Без змін"
+            else:
+                stats["updated"] += 1
+                action = "Оновлено"
+
+            new_catalog[index] = record
+
         else:
+            record = dict(metadata)
+            record["url"] = url
+
             new_catalog.append(record)
+            stats["added"] += 1
             action = "Додано"
 
-        updates.append(
-            (output_path, content, action, metadata["title"])
-        )
+        planned_files[output_path] = content
 
-    # Записуємо підготовлені історії.
-    try:
-        PUBLISHED.mkdir(parents=True, exist_ok=True)
+        print(f"[{action}] {metadata['title']}")
 
-        for output_path, content, action, title in updates:
-            output_path.write_text(content, encoding="utf-8")
-            print(
-                f"{action}: {title} → "
-                f"{output_path.relative_to(ROOT)}"
-            )
+    # --------------------------------------------------------
+    # 3. Перевірка наявних опублікованих файлів
+    # --------------------------------------------------------
 
-    except OSError as exc:
-        error("E006", f"Не вдалося записати опубліковану історію: {exc}")
-
-    # Збираємо URL усіх TXT-файлів, які залишилися опублікованими.
-    published_urls = {
-        make_url(path)
-        for path in PUBLISHED.glob("*.txt")
-        if path.is_file()
+    # Ураховуємо також файли, які зараз готуються до публікації.
+    existing_filenames = {
+        path.name.casefold()
+        for path in published_files
     }
 
-    # Видаляємо записи, чиї опубліковані файли видалені.
-    cleaned_catalog = []
-    removed_count = 0
+    for output_path in planned_files:
+        existing_filenames.add(output_path.name.casefold())
 
-    for item in new_catalog:
-        if not isinstance(item, dict):
-            cleaned_catalog.append(item)
-            continue
+    catalog_urls = {
+        item["url"]
+        for item in new_catalog
+        if isinstance(item.get("url"), str)
+    }
 
-        url = item.get("url", "")
+    orphan_files = []
+
+    for path in published_files:
+        url = make_url(path)
 
         if (
-            isinstance(url, str)
-            and url.startswith(PUBLISHED_URL_PREFIX)
+            path.name.casefold() not in {
+                p.name.casefold() for p in planned_files
+            }
+            and url not in catalog_urls
+        ):
+            orphan_files.append(path)
+
+    stats["orphans"] = len(orphan_files)
+
+    for path in orphan_files:
+        warning(
+            f"Опублікований файл {path.name} не має запису в каталозі. "
+            "Автоматично відновити метадані неможливо."
+        )
+
+    # --------------------------------------------------------
+    # 4. Синхронізація видалених файлів
+    # --------------------------------------------------------
+
+    published_urls = {
+        make_url(path)
+        for path in published_files
+    }
+
+    # Додаємо URL файлів, які будуть створені.
+    published_urls.update(
+        make_url(path)
+        for path in planned_files
+    )
+
+    cleaned_catalog = []
+
+    for item in new_catalog:
+        url = item.get("url", "")
+
+        filename = published_filename_from_url(url)
+
+        if (
+            filename is not None
             and url not in published_urls
         ):
             print(
-                f"Видалено з каталогу: "
+                f"[ВИДАЛЕНО З КАТАЛОГУ] "
                 f"{item.get('title', 'Без назви')}"
             )
-            removed_count += 1
+            stats["removed"] += 1
         else:
             cleaned_catalog.append(item)
 
-    # Зберігаємо каталог.
+    new_catalog = cleaned_catalog
+
+    # --------------------------------------------------------
+    # 5. Перевірка цілісності майбутнього каталогу
+    # --------------------------------------------------------
+
+    final_titles = set()
+    final_urls = set()
+
+    for item in new_catalog:
+        title_key = normalize(item["title"])
+        url = item["url"]
+
+        if title_key in final_titles:
+            error("E122", f'Повторна назва "{item["title"]}".')
+
+        if url in final_urls:
+            error("E011", f"Повторний URL: {url}")
+
+        final_titles.add(title_key)
+        final_urls.add(url)
+
+    # --------------------------------------------------------
+    # 6. Попередній звіт
+    # --------------------------------------------------------
+
+    print("\n" + "=" * 55)
+    print("ЗВІТ ПЕРЕВІРКИ")
+    print("=" * 55)
+
+    print(f"Додано:                  {stats['added']}")
+    print(f"Оновлено:                {stats['updated']}")
+    print(f"Без змін:                {stats['unchanged']}")
+    print(f"Видалено з каталогу:     {stats['removed']}")
+    print(f"Загублених файлів:       {stats['orphans']}")
+    print(f"Попереджень:             {stats['warnings']}")
+
+    print(f"\nЗаписів у новому каталозі: {len(new_catalog)}")
+
+    if dry_run:
+        print("\nDRY-RUN: жодних файлів не змінено.")
+        print("Перевірка завершена.")
+        return
+
+    # --------------------------------------------------------
+    # 7. Підготовка всіх змін
+    # --------------------------------------------------------
+
+    catalog_output = (
+        json.dumps(
+            new_catalog,
+            ensure_ascii=False,
+            indent=2
+        ) + "\n"
+    )
+
+    all_outputs = dict(planned_files)
+    all_outputs[CATALOG] = catalog_output
+
+    # --------------------------------------------------------
+    # 8. Безпечний запис
+    # --------------------------------------------------------
+
+    temp_files = []
+
     try:
-        CATALOG.write_text(
-            json.dumps(cleaned_catalog, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        for path, content in all_outputs.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temp:
+                temp.write(content)
+                temp.flush()
+                os.fsync(temp.fileno())
+                temp_files.append((Path(temp.name), path))
+
+        # Після успішної підготовки замінюємо файли.
+        for temp_path, destination in temp_files:
+            os.replace(temp_path, destination)
+
     except OSError as exc:
-        error("E007", f"Не вдалося зберегти catalog.json: {exc}")
+        for temp_path, _ in temp_files:
+            try:
+                if temp_path.exists():
+                    temp_path.unlink()
+            except OSError:
+                pass
 
-    print(f"Видалено записів із каталогу: {removed_count}")
-    print("Синхронізацію завершено успішно.")
+        error("E006", f"Не вдалося записати файли: {exc}")
 
+    # --------------------------------------------------------
+    # 9. Завершення
+    # --------------------------------------------------------
+
+    print("\n" + "=" * 55)
+    print("ПУБЛІКАЦІЮ ЗАВЕРШЕНО")
+    print("=" * 55)
+
+    print(f"Додано:              {stats['added']}")
+    print(f"Оновлено:            {stats['updated']}")
+    print(f"Без змін:            {stats['unchanged']}")
+    print(f"Видалено записів:    {stats['removed']}")
+    print(f"Загублених файлів:   {stats['orphans']}")
+    print(f"Попереджень:         {stats['warnings']}")
+
+    print("\nБібліотека синхронізована успішно.")
+
+
+# ============================================================
+# ЗАПУСК
+# ============================================================
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Story Reader — автоматичний бібліотекар."
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Перевірити бібліотеку без внесення змін."
+    )
+
+    args = parser.parse_args()
+
     try:
-        main()
+        main(dry_run=args.dry_run)
+
     except PublishError as exc:
         print(
-            f"[{exc.code}] {exc.message}",
+            f"\n[{exc.code}] {exc.message}",
             file=sys.stderr
         )
         sys.exit(1)
+
     except Exception as exc:
         print(
-            f"[E999] Непередбачена помилка: {exc}",
+            f"\n[E999] Непередбачена помилка: {exc}",
             file=sys.stderr
         )
         sys.exit(1)
