@@ -24,21 +24,5 @@
     "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/test-story.txt",
     "theme": "default",
     "ageRating": "0+"
-  },
-  {
-    "title": "JGFXF",
-    "author": "Krishan FFFFFFFFFCoupland",
-    "genre": "Фентезі",
-    "description": "Химерне фентезійнеgfghjklkjhgfcvbjkhgf оповідання про незвичайних істот і таємниці саду.",
-    "detailedDescription": "Повний опис історії.",
-    "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/Published%20Stories/BLUE_EXP.txt",
-    "theme": "fantasy",
-    "ageRating": "18+",
-    "contentWarnings": [
-      "Інтимні теми",
-      "Сексуальний зміст",
-      "Складні романтичні стосунки"
-    ],
-    "ratingDescription": "Містить дорослі теми та інтимний зміст."
   }
 ]
