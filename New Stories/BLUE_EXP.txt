@@ -1,0 +1,26 @@
+<!-- STORY-METADATA -->
+{
+    "title": "JGFXF",
+    "author": "Krishan FFFFFFFFFCoupland",
+    "genre": "Фентезі",
+    "description": "Химерне фентезійнеgfghjklkjhgfcvbjkhgf оповідання про незвичайних істот і таємниці саду.",
+    "detailedDescription": "Повний опис історії.",
+    "url": "",
+    "theme": "fantasy",
+    "ageRating": "18+",
+    "contentWarnings": [
+        "Інтимні теми",
+        "Сексуальний зміст",
+        "Складні романтичні стосунки"
+    ],
+    "ratingDescription": "Містить дорослі теми та інтимний зміст."
+}
+<!-- STORY-CONTENT -->
+
+<<readerui>>
+BLUE (СИНІЙ)
+Автор: Krishan Coupland
+
+<<storytype>>
+Тут починається історія...
+<</storytype>>
