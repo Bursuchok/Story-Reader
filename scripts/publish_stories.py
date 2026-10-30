@@ -13,6 +13,15 @@ CATALOG = ROOT / "catalog.json"
 METADATA_MARKER = "<!-- STORY-METADATA -->"
 CONTENT_MARKER = "<!-- STORY-CONTENT -->"
 
+RAW_BASE_URL = (
+    "https://raw.githubusercontent.com/"
+    "Bursuchok/Story-Reader/refs/heads/main/"
+)
+
+PUBLISHED_URL_PREFIX = (
+    RAW_BASE_URL + quote("Published Stories", safe="/") + "/"
+)
+
 REQUIRED_FIELDS = [
     "title",
     "author",
@@ -25,11 +34,15 @@ REQUIRED_FIELDS = [
 ]
 
 
+def make_url(path):
+    relative_path = path.relative_to(ROOT).as_posix()
+    return RAW_BASE_URL + quote(relative_path, safe="/")
+
+
 def read_source(path):
     text = path.read_text(encoding="utf-8-sig")
     lines = text.splitlines(keepends=True)
 
-    # Перевіряємо кількість маркерів.
     if sum(line.strip() == METADATA_MARKER for line in lines) != 1:
         raise ValueError(
             f"{path.name}: маркер STORY-METADATA має бути рівно один."
@@ -61,7 +74,6 @@ def read_source(path):
 
     content_lines = lines[content_line + 1:]
 
-    # Прибираємо один порожній рядок після маркера, якщо він є.
     if content_lines and not content_lines[0].strip():
         content_lines = content_lines[1:]
 
@@ -70,7 +82,6 @@ def read_source(path):
     if not content.strip():
         raise ValueError(f"{path.name}: текст історії порожній.")
 
-    # Читаємо JSON.
     try:
         metadata = json.loads(metadata_text)
     except json.JSONDecodeError as error:
@@ -83,7 +94,6 @@ def read_source(path):
             f"{path.name}: метадані повинні бути JSON-об'єктом."
         )
 
-    # Перевіряємо обов'язкові текстові поля.
     for field in REQUIRED_FIELDS:
         value = metadata.get(field)
 
@@ -92,7 +102,6 @@ def read_source(path):
                 f"{path.name}: відсутнє або порожнє обов'язкове поле: {field}"
             )
 
-    # contentWarnings обов'язкове, але список може бути порожнім.
     if "contentWarnings" not in metadata:
         raise ValueError(
             f"{path.name}: відсутнє обов'язкове поле: contentWarnings"
@@ -113,7 +122,6 @@ def read_source(path):
             f"{path.name}: кожне попередження має бути непорожнім текстом."
         )
 
-    # Перевіряємо структуру історії.
     opening_tag = "<<storytype>>"
     closing_tag = "<</storytype>>"
 
@@ -157,18 +165,16 @@ def main():
     try:
         catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        raise ValueError(f"Помилка JSON у catalog.json: {error}") from error
+        raise ValueError(
+            f"Помилка JSON у catalog.json: {error}"
+        ) from error
 
     if not isinstance(catalog, list):
         raise ValueError("catalog.json повинен містити JSON-масив.")
 
     source_files = sorted(INBOX.glob("*.txt"))
 
-    if not source_files:
-        print("У New Stories немає TXT-файлів.")
-        return
-
-    # Спочатку перевіряємо всі файли.
+    # Спочатку перевіряємо всі вхідні файли.
     prepared = []
     seen_titles = set()
 
@@ -183,24 +189,15 @@ def main():
             )
 
         seen_titles.add(title_key)
-
         prepared.append((source, metadata, content))
 
-    # Перевіряємо каталог і готуємо зміни до запису.
-    updates = []
+    # Готуємо нові записи каталогу та файли для публікації.
     new_catalog = list(catalog)
+    updates = []
 
     for source, metadata, content in prepared:
         output_path = PUBLISHED / source.name
-
-        relative_path = output_path.relative_to(ROOT).as_posix()
-        encoded_path = quote(relative_path, safe="/")
-
-        url = (
-            "https://raw.githubusercontent.com/"
-            "Bursuchok/Story-Reader/refs/heads/main/"
-            + encoded_path
-        )
+        url = make_url(output_path)
 
         record = dict(metadata)
         record["url"] = url
@@ -227,19 +224,52 @@ def main():
 
         updates.append((output_path, content, action, metadata["title"]))
 
-    # Лише тепер, коли всі перевірки пройшли, записуємо файли.
+    # Записуємо підготовлені історії.
     PUBLISHED.mkdir(parents=True, exist_ok=True)
 
     for output_path, content, action, title in updates:
         output_path.write_text(content, encoding="utf-8")
         print(f"{action}: {title} → {output_path.relative_to(ROOT)}")
 
+    # Збираємо URL усіх TXT-файлів, які реально залишилися опублікованими.
+    published_urls = {
+        make_url(path)
+        for path in PUBLISHED.glob("*.txt")
+        if path.is_file()
+    }
+
+    # Видаляємо з каталогу записи, чиї файли були видалені.
+    cleaned_catalog = []
+    removed_count = 0
+
+    for item in new_catalog:
+        if not isinstance(item, dict):
+            cleaned_catalog.append(item)
+            continue
+
+        url = item.get("url", "")
+
+        if (
+            isinstance(url, str)
+            and url.startswith(PUBLISHED_URL_PREFIX)
+            and url not in published_urls
+        ):
+            print(
+                f"Видалено з каталогу: "
+                f"{item.get('title', 'Без назви')}"
+            )
+            removed_count += 1
+        else:
+            cleaned_catalog.append(item)
+
+    # Зберігаємо каталог.
     CATALOG.write_text(
-        json.dumps(new_catalog, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(cleaned_catalog, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
-    print("Публікацію завершено успішно.")
+    print(f"Видалено записів із каталогу: {removed_count}")
+    print("Синхронізацію завершено успішно.")
 
 
 if __name__ == "__main__":
