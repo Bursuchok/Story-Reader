@@ -31,7 +31,7 @@ PUBLISHED_URL_PREFIX = (
     RAW_BASE_URL + quote("Published Stories", safe="/") + "/"
 )
 
-# Ці поля обов'язкові для кожної нової історії.
+# Обов'язкові поля нової історії.
 REQUIRED_FIELDS = [
     "title",
     "author",
@@ -42,7 +42,7 @@ REQUIRED_FIELDS = [
     "ageRating",
 ]
 
-# Ці поля необов'язкові.
+# Необов'язкові поля.
 OPTIONAL_CONTENT_FIELDS = [
     "contentWarnings",
     "ratingDescription",
@@ -126,42 +126,6 @@ def load_json(text, filename):
         )
     except ValueError as exc:
         error("E008", f"{filename}: {exc}")
-
-
-def atomic_write(path, content):
-    """
-    Записує файл через тимчасовий файл.
-    Оригінал замінюється лише після успішного запису.
-    """
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    temp_path = None
-
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as temp:
-            temp.write(content)
-            temp.flush()
-            os.fsync(temp.fileno())
-            temp_path = Path(temp.name)
-
-        os.replace(temp_path, path)
-
-    except OSError:
-        if temp_path and temp_path.exists():
-            try:
-                temp_path.unlink()
-            except OSError:
-                pass
-        raise
 
 
 def is_published_url(url):
@@ -284,7 +248,7 @@ def validate_metadata(metadata, filename):
         if isinstance(value, str) and len(value) > limit:
             warning(
                 f'{filename} — поле "{field}" має '
-                f'{len(value)} символів. "
+                f'{len(value)} символів. '
                 f"Рекомендована межа: {limit}."
             )
 
@@ -292,7 +256,7 @@ def validate_metadata(metadata, filename):
 
 
 # ============================================================
-# ЧИТАННЯ ТА ПЕРЕВІРКА ІСТОРІЙ
+# ЧИТАННЯ ТА ПЕРЕВІРКА НОВИХ ІСТОРІЙ
 # ============================================================
 
 def read_source(path):
@@ -411,25 +375,18 @@ def load_catalog():
     except OSError as exc:
         error("E003", f"Не вдалося прочитати catalog.json: {exc}")
 
-    # Порожній файл або файл із пробілами = порожній каталог.
     if not catalog_text.strip():
         print("Каталог порожній. Буде створено новий [].")
         return []
 
     catalog = load_json(catalog_text, "catalog.json")
 
+    # Для роботи потрібен JSON-масив.
     if not isinstance(catalog, list):
         error("E005", "catalog.json повинен містити JSON-масив [].")
 
-    # Не перевіряємо наявність метаданих у старих записах.
-    # Зберігаємо їх такими, якими вони є.
-    for index, item in enumerate(catalog, start=1):
-        if not isinstance(item, dict):
-            error(
-                "E009",
-                f"Запис №{index} у каталозі повинен бути об'єктом."
-            )
-
+    # Жодних перевірок старих записів:
+    # не перевіряємо поля, назви, URL, дублікати чи метадані.
     return catalog
 
 
@@ -513,7 +470,11 @@ def main(dry_run=False):
     # 2. Підготовка нового каталогу
     # --------------------------------------------------------
 
-    new_catalog = [dict(item) for item in catalog]
+    new_catalog = [
+        dict(item) if isinstance(item, dict) else item
+        for item in catalog
+    ]
+
     planned_files = {}
 
     for source, metadata, content in prepared:
@@ -522,26 +483,19 @@ def main(dry_run=False):
 
         title_key = normalize(metadata["title"])
 
+        # Шукаємо збіг лише серед записів-об'єктів.
+        # Решту старих елементів каталогу не перевіряємо.
         matches = [
             i for i, item in enumerate(new_catalog)
-            if isinstance(item.get("title"), str)
-            and normalize(item["title"]) == title_key
+            if (
+                isinstance(item, dict)
+                and isinstance(item.get("title"), str)
+                and normalize(item["title"]) == title_key
+            )
         ]
 
-        if len(matches) > 1:
-            error(
-                "E122",
-                f'Кілька записів із назвою "{metadata["title"]}".'
-            )
-
-        # Не дозволяємо двом історіям використовувати один URL.
-        for i, item in enumerate(new_catalog):
-            if i not in matches and item.get("url") == url:
-                error(
-                    "E011",
-                    f"URL {url} уже використовується іншою історією."
-                )
-
+        # Якщо є кілька збігів, оновлюємо перший.
+        # Інші старі записи не перевіряються і не блокують процес.
         if matches:
             index = matches[0]
 
@@ -572,13 +526,16 @@ def main(dry_run=False):
         print(f"[{action}] {metadata['title']}")
 
     # --------------------------------------------------------
-    # 3. Перевірка наявних опублікованих файлів
+    # 3. Пошук опублікованих файлів без запису в каталозі
     # --------------------------------------------------------
 
     catalog_urls = {
-        item["url"]
+        item.get("url")
         for item in new_catalog
-        if isinstance(item.get("url"), str)
+        if (
+            isinstance(item, dict)
+            and isinstance(item.get("url"), str)
+        )
     }
 
     planned_names = {
@@ -614,7 +571,6 @@ def main(dry_run=False):
         for path in published_files
     }
 
-    # Додаємо URL файлів, які будуть створені.
     published_urls.update(
         make_url(path)
         for path in planned_files
@@ -623,6 +579,11 @@ def main(dry_run=False):
     cleaned_catalog = []
 
     for item in new_catalog:
+        # Необ'єктні елементи залишаємо без змін.
+        if not isinstance(item, dict):
+            cleaned_catalog.append(item)
+            continue
+
         url = item.get("url", "")
 
         filename = published_filename_from_url(url)
@@ -642,32 +603,7 @@ def main(dry_run=False):
     new_catalog = cleaned_catalog
 
     # --------------------------------------------------------
-    # 5. Перевірка цілісності майбутнього каталогу
-    # --------------------------------------------------------
-
-    final_titles = set()
-    final_urls = set()
-
-    for item in new_catalog:
-        title = item.get("title")
-        url = item.get("url")
-
-        if isinstance(title, str) and title.strip():
-            title_key = normalize(title)
-
-            if title_key in final_titles:
-                error("E122", f'Повторна назва "{title}".')
-
-            final_titles.add(title_key)
-
-        if isinstance(url, str) and url.strip():
-            if url in final_urls:
-                error("E011", f"Повторний URL: {url}")
-
-            final_urls.add(url)
-
-    # --------------------------------------------------------
-    # 6. Попередній звіт
+    # 5. ЗВІТ
     # --------------------------------------------------------
 
     print("\n" + "=" * 55)
@@ -689,7 +625,7 @@ def main(dry_run=False):
         return
 
     # --------------------------------------------------------
-    # 7. Підготовка всіх змін
+    # 6. ПІДГОТОВКА ЗМІН
     # --------------------------------------------------------
 
     catalog_output = (
@@ -704,7 +640,7 @@ def main(dry_run=False):
     all_outputs[CATALOG] = catalog_output
 
     # --------------------------------------------------------
-    # 8. Безпечний запис
+    # 7. БЕЗПЕЧНИЙ ЗАПИС
     # --------------------------------------------------------
 
     temp_files = []
@@ -742,7 +678,7 @@ def main(dry_run=False):
         error("E006", f"Не вдалося записати файли: {exc}")
 
     # --------------------------------------------------------
-    # 9. Завершення
+    # 8. ЗАВЕРШЕННЯ
     # --------------------------------------------------------
 
     print("\n" + "=" * 55)
