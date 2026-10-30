@@ -8,21 +8,5 @@
     "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/test-story.txt",
     "theme": "default",
     "ageRating": "0+"
-  },
-  {
-    "title": "Blue (Синій)",
-    "author": "Krishan Coupland",
-    "genre": "Фентезі",
-    "description": "Химерне фентезійне оповідання про незвичайних істот і таємниці саду.",
-    "detailedDescription": "Blue — коротке фентезійне оповідання Крішана Купленда, що переносить читача у незвичайний світ, де за звичними декораціями саду ховається щось дивне. Історія поєднує фантастичні образи з химерною атмосферою та пропонує відкрити для себе авторське бачення цього світу.",
-    "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/Published%20Stories/BLUE_story%281%29.txt",
-    "theme": "fantasy",
-    "ageRating": "16+",
-    "contentWarnings": [
-      "Інтимні теми",
-      "Сексуальний зміст",
-      "Складні романтичні стосунки"
-    ],
-    "ratingDescription": "Містить дорослі теми та інтимний зміст. Рекомендується ознайомитися з попередженнями перед читанням."
   }
 ]
