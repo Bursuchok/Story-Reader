@@ -1,0 +1,7 @@
+<<readerui>>
+BLUE (СИНІЙ)
+Автор: Krishan Coupland
+
+<<storytype>>
+Тут починається історія...
+<</storytype>>
