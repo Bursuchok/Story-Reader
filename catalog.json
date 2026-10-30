@@ -14,5 +14,15 @@
     "Складні романтичні стосунки "
   ],
   "ratingDescription": "Містить дорослі теми та інтимний зміст. Рекомендується ознайомитися з попередженнями перед читанням."
+},
+  {
+  "title": "Тестова",
+  "author": "Технічна команда",
+  "genre": "Технічний",
+  "description": "-",
+  "detailedDescription": "",
+  "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/test-story.txt",
+  "theme": "default",
+  "ageRating": "0+",
 }
 ]
