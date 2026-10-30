@@ -1,3 +1,4 @@
+
 import json
 import sys
 from pathlib import Path
@@ -20,6 +21,7 @@ REQUIRED_FIELDS = [
     "detailedDescription",
     "theme",
     "ageRating",
+    "ratingDescription",
 ]
 
 
@@ -27,26 +29,36 @@ def read_source(path):
     text = path.read_text(encoding="utf-8-sig")
     lines = text.splitlines(keepends=True)
 
-    metadata_line = next(
-        (i for i, line in enumerate(lines)
-         if line.strip() == METADATA_MARKER),
-        None,
-    )
-    content_line = next(
-        (i for i, line in enumerate(lines)
-         if line.strip() == CONTENT_MARKER),
-        None,
-    )
-
-    if metadata_line is None or content_line is None:
+    # Перевіряємо кількість маркерів.
+    if sum(line.strip() == METADATA_MARKER for line in lines) != 1:
         raise ValueError(
-            "Не знайдено маркери STORY-METADATA або STORY-CONTENT."
+            f"{path.name}: маркер STORY-METADATA має бути рівно один."
         )
 
-    if content_line <= metadata_line:
-        raise ValueError("Маркери розташовані в неправильному порядку.")
+    if sum(line.strip() == CONTENT_MARKER for line in lines) != 1:
+        raise ValueError(
+            f"{path.name}: маркер STORY-CONTENT має бути рівно один."
+        )
 
-    metadata_text = "".join(lines[metadata_line + 1:content_line]).strip()
+    metadata_line = next(
+        i for i, line in enumerate(lines)
+        if line.strip() == METADATA_MARKER
+    )
+
+    content_line = next(
+        i for i, line in enumerate(lines)
+        if line.strip() == CONTENT_MARKER
+    )
+
+    if content_line <= metadata_line:
+        raise ValueError(
+            f"{path.name}: маркери розташовані в неправильному порядку."
+        )
+
+    metadata_text = "".join(
+        lines[metadata_line + 1:content_line]
+    ).strip()
+
     content_lines = lines[content_line + 1:]
 
     # Прибираємо один порожній рядок після маркера, якщо він є.
@@ -56,22 +68,81 @@ def read_source(path):
     content = "".join(content_lines)
 
     if not content.strip():
-        raise ValueError("Текст історії порожній.")
+        raise ValueError(f"{path.name}: текст історії порожній.")
 
-    metadata = json.loads(metadata_text)
+    # Читаємо JSON.
+    try:
+        metadata = json.loads(metadata_text)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"{path.name}: помилка JSON у метаданих: {error}"
+        ) from error
 
     if not isinstance(metadata, dict):
-        raise ValueError("Метадані повинні бути JSON-об'єктом.")
+        raise ValueError(
+            f"{path.name}: метадані повинні бути JSON-об'єктом."
+        )
 
+    # Перевіряємо обов'язкові текстові поля.
     for field in REQUIRED_FIELDS:
-        if not isinstance(metadata.get(field), str) or not metadata[field].strip():
-            raise ValueError(f"Відсутнє обов'язкове поле: {field}")
+        value = metadata.get(field)
 
-    warnings = metadata.get("contentWarnings", [])
-    if not isinstance(warnings, list) or not all(
-        isinstance(item, str) for item in warnings
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"{path.name}: відсутнє або порожнє обов'язкове поле: {field}"
+            )
+
+    # contentWarnings обов'язкове, але список може бути порожнім.
+    if "contentWarnings" not in metadata:
+        raise ValueError(
+            f"{path.name}: відсутнє обов'язкове поле: contentWarnings"
+        )
+
+    warnings = metadata["contentWarnings"]
+
+    if not isinstance(warnings, list):
+        raise ValueError(
+            f"{path.name}: contentWarnings має бути списком."
+        )
+
+    if not all(
+        isinstance(item, str) and item.strip()
+        for item in warnings
     ):
-        raise ValueError("contentWarnings має бути списком текстових значень.")
+        raise ValueError(
+            f"{path.name}: кожне попередження має бути непорожнім текстом."
+        )
+
+    # Перевіряємо структуру історії.
+    opening_tag = "<<storytype>>"
+    closing_tag = "<</storytype>>"
+
+    if content.count(opening_tag) != 1:
+        raise ValueError(
+            f"{path.name}: тег <<storytype>> має бути рівно один."
+        )
+
+    if content.count(closing_tag) != 1:
+        raise ValueError(
+            f"{path.name}: тег <</storytype>> має бути рівно один."
+        )
+
+    opening_position = content.find(opening_tag)
+    closing_position = content.find(closing_tag)
+
+    if closing_position <= opening_position:
+        raise ValueError(
+            f"{path.name}: теги storytype розташовані в неправильному порядку."
+        )
+
+    story_body = content[
+        opening_position + len(opening_tag):closing_position
+    ]
+
+    if not story_body.strip():
+        raise ValueError(
+            f"{path.name}: між тегами storytype немає тексту."
+        )
 
     return metadata, content
 
@@ -83,7 +154,10 @@ def main():
     if not INBOX.exists():
         raise FileNotFoundError("Не знайдено папку New Stories.")
 
-    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
+    try:
+        catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Помилка JSON у catalog.json: {error}") from error
 
     if not isinstance(catalog, list):
         raise ValueError("catalog.json повинен містити JSON-масив.")
@@ -94,7 +168,7 @@ def main():
         print("У New Stories немає TXT-файлів.")
         return
 
-    # Спочатку перевіряємо всі джерела. Якщо є помилка — нічого не публікуємо.
+    # Спочатку перевіряємо всі файли.
     prepared = []
     seen_titles = set()
 
@@ -109,15 +183,19 @@ def main():
             )
 
         seen_titles.add(title_key)
+
         prepared.append((source, metadata, content))
 
-    PUBLISHED.mkdir(parents=True, exist_ok=True)
+    # Перевіряємо каталог і готуємо зміни до запису.
+    updates = []
+    new_catalog = list(catalog)
 
     for source, metadata, content in prepared:
         output_path = PUBLISHED / source.name
 
         relative_path = output_path.relative_to(ROOT).as_posix()
         encoded_path = quote(relative_path, safe="/")
+
         url = (
             "https://raw.githubusercontent.com/"
             "Bursuchok/Story-Reader/refs/heads/main/"
@@ -127,9 +205,8 @@ def main():
         record = dict(metadata)
         record["url"] = url
 
-        # Знаходимо історію за назвою: оновлюємо її, якщо вона вже є.
         matches = [
-            i for i, item in enumerate(catalog)
+            i for i, item in enumerate(new_catalog)
             if isinstance(item, dict)
             and str(item.get("title", "")).strip().casefold()
             == metadata["title"].strip().casefold()
@@ -142,17 +219,23 @@ def main():
             )
 
         if matches:
-            catalog[matches[0]] = record
+            new_catalog[matches[0]] = record
             action = "Оновлено"
         else:
-            catalog.append(record)
+            new_catalog.append(record)
             action = "Додано"
 
+        updates.append((output_path, content, action, metadata["title"]))
+
+    # Лише тепер, коли всі перевірки пройшли, записуємо файли.
+    PUBLISHED.mkdir(parents=True, exist_ok=True)
+
+    for output_path, content, action, title in updates:
         output_path.write_text(content, encoding="utf-8")
-        print(f"{action}: {metadata['title']} → {relative_path}")
+        print(f"{action}: {title} → {output_path.relative_to(ROOT)}")
 
     CATALOG.write_text(
-        json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(new_catalog, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
