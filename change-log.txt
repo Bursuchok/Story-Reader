@@ -10,7 +10,7 @@
     <section class="sr-cl-project">
         <div class="sr-cl-project-status">
             <span class="sr-cl-status-dot"></span>
-            <span>1.2.0а</span>
+            <span>1.2.7а</span>
         </div>
 
         <h2>Story Reader</h2>
