@@ -1,3 +1,4 @@
+
 import argparse
 import json
 import os
@@ -5,7 +6,7 @@ import sys
 import tempfile
 
 from pathlib import Path
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 
 
 # ============================================================
@@ -30,6 +31,7 @@ PUBLISHED_URL_PREFIX = (
     RAW_BASE_URL + quote("Published Stories", safe="/") + "/"
 )
 
+# Ці поля обов'язкові для кожної нової історії.
 REQUIRED_FIELDS = [
     "title",
     "author",
@@ -38,11 +40,15 @@ REQUIRED_FIELDS = [
     "detailedDescription",
     "theme",
     "ageRating",
+]
+
+# Ці поля необов'язкові.
+OPTIONAL_CONTENT_FIELDS = [
+    "contentWarnings",
     "ratingDescription",
 ]
 
 # Межі довжини не блокують публікацію.
-# Вони лише показують попередження.
 FIELD_LENGTH_LIMITS = {
     "title": 100,
     "description": 300,
@@ -184,7 +190,7 @@ def published_filename_from_url(url):
 
 
 # ============================================================
-# ПЕРЕВІРКА МЕТАДАНИХ
+# ПЕРЕВІРКА МЕТАДАНИХ НОВОЇ ІСТОРІЇ
 # ============================================================
 
 def validate_metadata(metadata, filename):
@@ -193,6 +199,10 @@ def validate_metadata(metadata, filename):
             "E109",
             f"{filename} — метадані повинні бути JSON-об'єктом."
         )
+
+    # --------------------------------------------------------
+    # 1. Обов'язкові поля
+    # --------------------------------------------------------
 
     for field in REQUIRED_FIELDS:
         if field not in metadata:
@@ -209,34 +219,73 @@ def validate_metadata(metadata, filename):
                 f'{filename} — поле "{field}" має бути непорожнім текстом.'
             )
 
+    # --------------------------------------------------------
+    # 2. Необов'язкові попередження про зміст
+    # --------------------------------------------------------
+
     if "contentWarnings" not in metadata:
-        error(
-            "E112",
-            f'{filename} — відсутнє поле "contentWarnings".'
+        warning(
+            f'{filename} — відсутнє поле "contentWarnings". '
+            "Публікація продовжується без позначок про чутливий зміст."
         )
 
-    warnings_list = metadata["contentWarnings"]
+    else:
+        warnings_list = metadata["contentWarnings"]
 
-    if not isinstance(warnings_list, list):
-        error(
-            "E113",
-            f'{filename} — "contentWarnings" має бути списком [].'
+        if not isinstance(warnings_list, list):
+            warning(
+                f'{filename} — "contentWarnings" має бути списком. '
+                "Значення не перевірено."
+            )
+
+        elif not warnings_list:
+            warning(
+                f'{filename} — список "contentWarnings" порожній.'
+            )
+
+        elif not all(
+            isinstance(item, str) and item.strip()
+            for item in warnings_list
+        ):
+            warning(
+                f'{filename} — "contentWarnings" містить '
+                "некоректні елементи."
+            )
+
+    # --------------------------------------------------------
+    # 3. Необов'язковий опис вікового рейтингу
+    # --------------------------------------------------------
+
+    if "ratingDescription" not in metadata:
+        warning(
+            f'{filename} — відсутнє поле "ratingDescription". '
+            "Пояснення вікового рейтингу не додано."
         )
 
-    if not all(
-        isinstance(item, str) and item.strip()
-        for item in warnings_list
-    ):
-        error(
-            "E114",
-            f'{filename} — кожне попередження має бути непорожнім текстом.'
-        )
+    else:
+        rating_description = metadata["ratingDescription"]
+
+        if (
+            not isinstance(rating_description, str)
+            or not rating_description.strip()
+        ):
+            warning(
+                f'{filename} — поле "ratingDescription" порожнє '
+                "або має неправильний формат."
+            )
+
+    # --------------------------------------------------------
+    # 4. Рекомендовані межі довжини
+    # --------------------------------------------------------
 
     for field, limit in FIELD_LENGTH_LIMITS.items():
-        if len(metadata[field]) > limit:
+        value = metadata.get(field)
+
+        if isinstance(value, str) and len(value) > limit:
             warning(
                 f'{filename} — поле "{field}" має '
-                f'{len(metadata[field])} символів. Рекомендована межа: {limit}.'
+                f'{len(value)} символів. "
+                f"Рекомендована межа: {limit}."
             )
 
     return metadata
@@ -350,7 +399,7 @@ def read_source(path):
 
 
 # ============================================================
-# ПЕРЕВІРКА КАТАЛОГУ
+# ЧИТАННЯ КАТАЛОГУ
 # ============================================================
 
 def load_catalog():
@@ -372,43 +421,14 @@ def load_catalog():
     if not isinstance(catalog, list):
         error("E005", "catalog.json повинен містити JSON-масив [].")
 
-    seen_titles = set()
-    seen_urls = set()
-
+    # Не перевіряємо наявність метаданих у старих записах.
+    # Зберігаємо їх такими, якими вони є.
     for index, item in enumerate(catalog, start=1):
         if not isinstance(item, dict):
             error(
                 "E009",
                 f"Запис №{index} у каталозі повинен бути об'єктом."
             )
-
-        validate_metadata(item, f"catalog.json, запис №{index}")
-
-        url = item.get("url")
-
-        if not isinstance(url, str) or not url.strip():
-            error(
-                "E010",
-                f"Запис №{index} не має правильного URL."
-            )
-
-        title_key = normalize(item["title"])
-        url_key = url.strip()
-
-        if title_key in seen_titles:
-            error(
-                "E122",
-                f'У каталозі повторюється назва "{item["title"]}".'
-            )
-
-        if url_key in seen_urls:
-            error(
-                "E011",
-                f"У каталозі повторюється URL: {url_key}"
-            )
-
-        seen_titles.add(title_key)
-        seen_urls.add(url_key)
 
     return catalog
 
@@ -504,7 +524,8 @@ def main(dry_run=False):
 
         matches = [
             i for i, item in enumerate(new_catalog)
-            if normalize(item["title"]) == title_key
+            if isinstance(item.get("title"), str)
+            and normalize(item["title"]) == title_key
         ]
 
         if len(matches) > 1:
@@ -554,19 +575,15 @@ def main(dry_run=False):
     # 3. Перевірка наявних опублікованих файлів
     # --------------------------------------------------------
 
-    # Ураховуємо також файли, які зараз готуються до публікації.
-    existing_filenames = {
-        path.name.casefold()
-        for path in published_files
-    }
-
-    for output_path in planned_files:
-        existing_filenames.add(output_path.name.casefold())
-
     catalog_urls = {
         item["url"]
         for item in new_catalog
         if isinstance(item.get("url"), str)
+    }
+
+    planned_names = {
+        path.name.casefold()
+        for path in planned_files
     }
 
     orphan_files = []
@@ -575,9 +592,7 @@ def main(dry_run=False):
         url = make_url(path)
 
         if (
-            path.name.casefold() not in {
-                p.name.casefold() for p in planned_files
-            }
+            path.name.casefold() not in planned_names
             and url not in catalog_urls
         ):
             orphan_files.append(path)
@@ -634,17 +649,22 @@ def main(dry_run=False):
     final_urls = set()
 
     for item in new_catalog:
-        title_key = normalize(item["title"])
-        url = item["url"]
+        title = item.get("title")
+        url = item.get("url")
 
-        if title_key in final_titles:
-            error("E122", f'Повторна назва "{item["title"]}".')
+        if isinstance(title, str) and title.strip():
+            title_key = normalize(title)
 
-        if url in final_urls:
-            error("E011", f"Повторний URL: {url}")
+            if title_key in final_titles:
+                error("E122", f'Повторна назва "{title}".')
 
-        final_titles.add(title_key)
-        final_urls.add(url)
+            final_titles.add(title_key)
+
+        if isinstance(url, str) and url.strip():
+            if url in final_urls:
+                error("E011", f"Повторний URL: {url}")
+
+            final_urls.add(url)
 
     # --------------------------------------------------------
     # 6. Попередній звіт
