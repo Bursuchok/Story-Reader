@@ -35,7 +35,7 @@ PUBLISHED_URL_PREFIX = (
 REQUIRED_FIELDS = [
     "title",
     "author",
-    "genre",
+    "genres",
     "description",
     "detailedDescription",
     "theme",
@@ -43,7 +43,8 @@ REQUIRED_FIELDS = [
 ]
 
 # Необов'язкові поля.
-OPTIONAL_CONTENT_FIELDS = [
+OPTIONAL_FIELDS = [
+    "readingTime",
     "contentWarnings",
     "ratingDescription",
 ]
@@ -154,7 +155,7 @@ def published_filename_from_url(url):
 
 
 # ============================================================
-# ПЕРЕВІРКА МЕТАДАНИХ НОВОЇ ІСТОРІЇ
+# ПЕРЕВІРКА ТА НОРМАЛІЗАЦІЯ МЕТАДАНИХ
 # ============================================================
 
 def validate_metadata(metadata, filename):
@@ -165,7 +166,30 @@ def validate_metadata(metadata, filename):
         )
 
     # --------------------------------------------------------
-    # 1. Обов'язкові поля
+    # 1. Сумісність зі старим форматом genre
+    # --------------------------------------------------------
+
+    if "genres" not in metadata and "genre" in metadata:
+        old_genre = metadata["genre"]
+
+        if isinstance(old_genre, str) and old_genre.strip():
+            metadata["genres"] = [old_genre.strip()]
+
+            warning(
+                f'{filename} — використано старе поле "genre". '
+                'Автоматично перетворено на "genres".'
+            )
+        else:
+            error(
+                "E122",
+                f'{filename} — старе поле "genre" має неправильний формат.'
+            )
+
+    # Видаляємо застаріле поле, якщо воно залишилося.
+    metadata.pop("genre", None)
+
+    # --------------------------------------------------------
+    # 2. Обов'язкові поля
     # --------------------------------------------------------
 
     for field in REQUIRED_FIELDS:
@@ -177,6 +201,9 @@ def validate_metadata(metadata, filename):
 
         value = metadata[field]
 
+        if field == "genres":
+            continue
+
         if not isinstance(value, str) or not value.strip():
             error(
                 "E111",
@@ -184,7 +211,75 @@ def validate_metadata(metadata, filename):
             )
 
     # --------------------------------------------------------
-    # 2. Необов'язкові попередження про зміст
+    # 3. Перевірка списку жанрів
+    # --------------------------------------------------------
+
+    genres = metadata["genres"]
+
+    if not isinstance(genres, list):
+        error(
+            "E123",
+            f'{filename} — поле "genres" повинно бути списком.'
+        )
+
+    if not genres:
+        error(
+            "E124",
+            f'{filename} — список "genres" не може бути порожнім.'
+        )
+
+    if not all(
+        isinstance(item, str) and item.strip()
+        for item in genres
+    ):
+        error(
+            "E125",
+            f'{filename} — "genres" містить некоректні елементи.'
+        )
+
+    # Прибираємо пробіли та дублікати жанрів.
+    normalized_genres = []
+    seen_genres = set()
+
+    for genre in genres:
+        genre = genre.strip()
+        key = normalize(genre)
+
+        if key not in seen_genres:
+            normalized_genres.append(genre)
+            seen_genres.add(key)
+
+    metadata["genres"] = normalized_genres
+
+    # --------------------------------------------------------
+    # 4. Необов'язковий час читання
+    # --------------------------------------------------------
+
+    if "readingTime" not in metadata:
+        warning(
+            f'{filename} — відсутнє поле "readingTime". '
+            "Час читання не буде показано."
+        )
+
+    else:
+        reading_time = metadata["readingTime"]
+
+        if (
+            not isinstance(reading_time, str)
+            or not reading_time.strip()
+        ):
+            warning(
+                f'{filename} — поле "readingTime" порожнє '
+                "або має неправильний формат. "
+                "Час читання не буде показано."
+            )
+            metadata.pop("readingTime", None)
+
+        else:
+            metadata["readingTime"] = reading_time.strip()
+
+    # --------------------------------------------------------
+    # 5. Необов'язкові попередження про зміст
     # --------------------------------------------------------
 
     if "contentWarnings" not in metadata:
@@ -202,11 +297,6 @@ def validate_metadata(metadata, filename):
                 "Значення не перевірено."
             )
 
-        elif not warnings_list:
-            warning(
-                f'{filename} — список "contentWarnings" порожній.'
-            )
-
         elif not all(
             isinstance(item, str) and item.strip()
             for item in warnings_list
@@ -216,8 +306,23 @@ def validate_metadata(metadata, filename):
                 "некоректні елементи."
             )
 
+        else:
+            # Прибираємо зайві пробіли та дублікати.
+            cleaned_warnings = []
+            seen_warnings = set()
+
+            for item in warnings_list:
+                item = item.strip()
+                key = normalize(item)
+
+                if key not in seen_warnings:
+                    cleaned_warnings.append(item)
+                    seen_warnings.add(key)
+
+            metadata["contentWarnings"] = cleaned_warnings
+
     # --------------------------------------------------------
-    # 3. Необов'язковий опис вікового рейтингу
+    # 6. Необов'язковий опис вікового рейтингу
     # --------------------------------------------------------
 
     if "ratingDescription" not in metadata:
@@ -239,7 +344,7 @@ def validate_metadata(metadata, filename):
             )
 
     # --------------------------------------------------------
-    # 4. Рекомендовані межі довжини
+    # 7. Рекомендовані межі довжини
     # --------------------------------------------------------
 
     for field, limit in FIELD_LENGTH_LIMITS.items():
@@ -381,12 +486,11 @@ def load_catalog():
 
     catalog = load_json(catalog_text, "catalog.json")
 
-    # Для роботи потрібен JSON-масив.
     if not isinstance(catalog, list):
         error("E005", "catalog.json повинен містити JSON-масив [].")
 
-    # Жодних перевірок старих записів:
-    # не перевіряємо поля, назви, URL, дублікати чи метадані.
+    # Старі записи не перевіряємо примусово.
+    # Вони залишаються сумісними з попереднім форматом.
     return catalog
 
 
@@ -484,7 +588,6 @@ def main(dry_run=False):
         title_key = normalize(metadata["title"])
 
         # Шукаємо збіг лише серед записів-об'єктів.
-        # Решту старих елементів каталогу не перевіряємо.
         matches = [
             i for i, item in enumerate(new_catalog)
             if (
@@ -494,8 +597,6 @@ def main(dry_run=False):
             )
         ]
 
-        # Якщо є кілька збігів, оновлюємо перший.
-        # Інші старі записи не перевіряються і не блокують процес.
         if matches:
             index = matches[0]
 
@@ -503,6 +604,9 @@ def main(dry_run=False):
             record = dict(new_catalog[index])
             record.update(metadata)
             record["url"] = url
+
+            # Видаляємо старе поле genre.
+            record.pop("genre", None)
 
             if record == new_catalog[index]:
                 stats["unchanged"] += 1
