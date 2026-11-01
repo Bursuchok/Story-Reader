@@ -1,6 +1,5 @@
 
 <!-- STORY-METADATA -->
-  {
 {
   "title": "Blue (Синій)",
   "author": "Krishan Coupland",
