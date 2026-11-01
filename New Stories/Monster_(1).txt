@@ -13,7 +13,7 @@
   "url": "",
   "theme": "horror",
   "ageRating": "16+",
-  "readingTime": "50–60 хв",
+  "readingTime": "~ 50–60 хв ~",
   "contentWarnings": [
     "Булінг",
     "Психологічний тиск",
