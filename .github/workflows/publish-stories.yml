@@ -32,16 +32,16 @@ jobs:
       - name: Publish stories
         run: python scripts/librarian.py
 
-      - name: Save published stories and catalog
+      - name: Save published stories, backups and catalog
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add "Published Stories" catalog.json
+          git add "Published Stories" "Saves" catalog.json
 
           if git diff --cached --quiet; then
             echo "No changes to publish."
           else
-            git commit -m "Publish approved stories"
+            git commit -m "Publish stories and save backups"
             git push
           fi
