@@ -3,30 +3,12 @@
   "messages": [
     {
       "title": "Вітаємо у StoryReader!",
-      "description": "Перше повідомлення",
+      "description": "Перше повідомлення 1 1 1 1 1 1 1 1 1 1 1 1",
       "date": "2026-11-03",
       "show": true,
       "icon": "i",
       "color": "info",
       "message": "Вітаємо вас на сервері <g>StoryReader</g>! Це наш перший сервер. <b>Приєднуйтеся до нашого Telegram!</b>"
-    },
-    {
-      "title": "Нове оновлення",
-      "description": "Новини проєкту",
-      "date": "2026-11-03",
-      "show": false,
-      "icon": "i",
-      "color": "info",
-      "message": "Ми продовжуємо розвивати StoryReader."
-    },
-    {
-      "title": "Технічні роботи",
-      "description": "Попередження",
-      "date": "2026-11-03",
-      "show": false,
-      "icon": "i",
-      "color": "warning",
-      "message": "Незабаром можуть виникнути короткочасні перебої в роботі."
     }
   ]
 }
