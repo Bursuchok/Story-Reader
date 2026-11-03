@@ -1,1 +1,23 @@
-
+{
+  "version": 1,
+  "messages": [
+    {
+      "id": 1,
+      "title": "Вітаємо у StoryReader!",
+      "description": "Перше повідомлення",
+      "date": "2026-11-03",
+      "icon": "info",
+      "color": "blue",
+      "message": "Вітаємо вас на сервері StoryReader! Це наш перший сервер. <g>Приєднуйтеся до нашого Telegram!</g>"
+    },
+    {
+      "id": 2,
+      "title": "Нове оновлення",
+      "description": "Новини проєкту",
+      "date": "2026-11-03",
+      "icon": "info",
+      "color": "blue",
+      "message": "Ми продовжуємо розвивати StoryReader."
+    }
+  ]
+}
