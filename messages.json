@@ -14,7 +14,7 @@
       "title": "Нове оновлення",
       "description": "Новини проєкту",
       "date": "2026-11-03",
-      "show": true,
+      "show": false,
       "icon": "i",
       "color": "info",
       "message": "Ми продовжуємо розвивати StoryReader."
@@ -23,7 +23,7 @@
       "title": "Технічні роботи",
       "description": "Попередження",
       "date": "2026-11-03",
-      "show": true,
+      "show": false,
       "icon": "!",
       "color": "warning",
       "message": "Незабаром можуть виникнути короткочасні перебої в роботі."
