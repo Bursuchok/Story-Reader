@@ -14,7 +14,7 @@
       "title": "Нове оновлення",
       "description": "Новини проєкту",
       "date": "2026-11-03",
-      "show": false,
+      "show": true,
       "icon": "i",
       "color": "info",
       "message": "Ми продовжуємо розвивати StoryReader."
