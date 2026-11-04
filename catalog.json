@@ -1,17 +1,5 @@
 [
   {
-    "title": "Тестова",
-    "author": "Технічна команда",
-    "genres": [
-      "Технічний"
-    ],
-    "description": "-",
-    "detailedDescription": "",
-    "url": "https://raw.githubusercontent.com/Bursuchok/Story-Reader/refs/heads/main/test-story.txt",
-    "theme": "default",
-    "ageRating": "0+"
-  },
-  {
     "title": "Blue (Синій)",
     "author": "Krishan Coupland",
     "genres": [
